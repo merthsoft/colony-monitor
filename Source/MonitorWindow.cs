@@ -1,41 +1,10 @@
 using System;
 using System.Linq;
-using HarmonyLib;
 using RimWorld;
 using UnityEngine;
 using Verse;
 
 namespace Merthsoft.ColonyMonitor;
-
-public sealed class ColonyMonitorMod : Mod
-{
-    public static ColonyMonitorMod Instance;
-    public static MonitorSettings Settings;
-    public ColonyMonitorMod(ModContentPack content) : base(content)
-    {
-        Instance = this;
-        Settings = GetSettings<MonitorSettings>();
-        new Harmony("Merthsoft.ColonyMonitor").PatchAll();
-    }
-
-    public override string SettingsCategory() => "Colony Monitor";
-    public override void DoSettingsWindowContents(Rect rect) => Settings.Draw(rect);
-}
-
-[HarmonyPatch(typeof(PlaySettings), nameof(PlaySettings.DoPlaySettingsGlobalControls))]
-public static class MonitorButton
-{
-    public static void Postfix(WidgetRow row)
-    {
-        if (Current.Game == null || Find.Maps.Count == 0) return;
-        if (row.ButtonText("Monitor"))
-        {
-            var window = Find.WindowStack.Windows.OfType<MonitorWindow>().FirstOrDefault();
-            if (window != null) window.Close();
-            else Find.WindowStack.Add(new MonitorWindow());
-        }
-    }
-}
 
 public sealed class MonitorWindow : Window
 {
@@ -143,8 +112,10 @@ public sealed class MonitorWindow : Window
         {
             width = selected.Size.x;
             height = selected.Size.z;
-            preview = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            preview.filterMode = FilterMode.Point;
+            preview = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point
+            };
             pixels = new Color[width * height];
         }
         for (int z = 0; z < height; z++)
@@ -279,12 +250,4 @@ public sealed class MonitorWindow : Window
         ReleaseTexture();
         base.PostClose();
     }
-}
-
-internal sealed class MonitorSettingsWindow : Window
-{
-    public override Vector2 InitialSize => new(610, 570);
-    internal MonitorSettingsWindow() { doCloseX = true; doCloseButton = true; }
-    public override void DoWindowContents(Rect rect) => ColonyMonitorMod.Settings.Draw(new Rect(0, 0, rect.width, rect.height - 50));
-    public override void PostClose() { ColonyMonitorMod.Instance.WriteSettings(); base.PostClose(); }
 }

@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using HarmonyLib;
 using UnityEngine;
 using UnityStubs.Rendering;
 using Verse;
-using RimWorld.Planet;
 using MeshDrawCommand = Waylith.Rendering.MeshDrawCommand;
 using MeshDrawSubmission = Waylith.Rendering.MeshDrawSubmission;
 using RenderTexture = UnityEngine.RenderTexture;
@@ -76,18 +74,26 @@ public sealed class CameraPreview : IDisposable
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = Color.black;
         }
-        if (target != null && target.width == resolution) return;
+        
+        if (target != null && target.width == resolution) 
+            return;
+        
         ReleaseTarget();
-        target = new RenderTexture(resolution, resolution, 24);
-        target.filterMode = FilterMode.Bilinear;
-        if (!target.Create()) throw new InvalidOperationException("Could not allocate the camera render texture.");
+        target = new RenderTexture(resolution, resolution, 24)
+        {
+            filterMode = FilterMode.Bilinear
+        };
+        
+        if (!target.Create()) 
+            throw new InvalidOperationException("Could not allocate the camera render texture.");
+        
         camera.targetTexture = target;
     }
 
     private void ReleaseTarget()
     {
         if (target == null) return;
-        if (camera != null) camera.targetTexture = null;
+        camera?.targetTexture = null;
         CameraTextureRenderer.Current?.ReleaseTarget(target);
         target.Release();
         UnityEngine.Object.Destroy(target);
@@ -101,98 +107,5 @@ public sealed class CameraPreview : IDisposable
         cameraObject = null;
         camera = null;
         commands.Clear();
-    }
-}
-
-// A mod may submit a persistent source outside the normal mesh queue. The
-// engine's BeginCapture does not capture those sources. Fail closed rather
-// than allowing the other map's geometry into the screen renderer.
-[HarmonyPatch(typeof(MeshDrawSubmission), nameof(MeshDrawSubmission.SubmitPersistentSource))]
-internal static class PreviewPersistentSourcePatch
-{
-    private static void Prefix()
-    {
-        if (PreviewContext.Active)
-            throw new NotSupportedException("A persistent draw source cannot be isolated for this preview.");
-    }
-}
-
-[HarmonyPatch(typeof(WorldRendererUtility), nameof(WorldRendererUtility.DrawingMap), MethodType.Getter)]
-internal static class PreviewDrawingMapPatch
-{
-    private static bool Prefix(ref bool __result)
-    {
-        if (!PreviewContext.Active) return true;
-        __result = true;
-        return false;
-    }
-}
-
-// Scope getter overrides to this thread and this synchronous draw only. Do not
-// assign CurrentMap: its setter changes selection, camera state and map events.
-internal sealed class PreviewContext : IDisposable
-{
-    [ThreadStatic] internal static PreviewContext Current;
-    internal static bool Active => Current != null;
-    internal readonly Map Map;
-    internal readonly Camera Camera;
-    internal readonly CellRect ViewRect;
-    internal readonly float Size;
-
-    internal PreviewContext(Map map, Camera camera, Rect rect, float size)
-    {
-        if (Current != null) throw new InvalidOperationException("Nested colony preview.");
-        Map = map;
-        Camera = camera;
-        Size = size;
-        ViewRect = CellRect.FromLimits((int)Math.Floor(rect.xMin), (int)Math.Floor(rect.yMin),
-            (int)Math.Ceiling(rect.xMax), (int)Math.Ceiling(rect.yMax));
-        Current = this;
-    }
-
-    public void Dispose() => Current = null;
-}
-
-[HarmonyPatch(typeof(Find), nameof(Find.CurrentMap), MethodType.Getter)]
-internal static class PreviewMapPatch
-{
-    private static bool Prefix(ref Map __result)
-    {
-        if (!PreviewContext.Active) return true;
-        __result = PreviewContext.Current.Map;
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(Find), nameof(Find.Camera), MethodType.Getter)]
-internal static class PreviewCameraPatch
-{
-    private static bool Prefix(ref Camera __result)
-    {
-        if (!PreviewContext.Active) return true;
-        __result = PreviewContext.Current.Camera;
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(CameraDriver), nameof(CameraDriver.CurrentViewRect), MethodType.Getter)]
-internal static class PreviewViewPatch
-{
-    private static bool Prefix(ref CellRect __result)
-    {
-        if (!PreviewContext.Active) return true;
-        __result = PreviewContext.Current.ViewRect;
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(CameraDriver), nameof(CameraDriver.RootSize), MethodType.Getter)]
-internal static class PreviewSizePatch
-{
-    private static bool Prefix(ref float __result)
-    {
-        if (!PreviewContext.Active) return true;
-        __result = PreviewContext.Current.Size;
-        return false;
     }
 }
