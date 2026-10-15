@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>Merthsoft.ColonyMonitor</AssemblyName>
+    <RootNamespace>Merthsoft.ColonyMonitor</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <OutputPath>..\1.7\Assemblies\</OutputPath>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Optimize>true</Optimize>
+    <Deterministic>false</Deterministic>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <AssemblySearchPaths>{HintPathFromItem};{TargetFrameworkDirectory};{RawFileName}</AssemblySearchPaths>
+    <RimWorldDir Condition="'$(RimWorldDir)' == ''">$(MSBuildProgramFiles32)\Steam\steamapps\common\RimWorld</RimWorldDir>
+    <HarmonyPath Condition="'$(HarmonyPath)' == ''">$(MSBuildProgramFiles32)\Steam\steamapps\workshop\content\294100\2009463077\1.7\Assemblies\0Harmony.dll</HarmonyPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp"><HintPath>$(RimWorldDir)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityStubs"><HintPath>$(RimWorldDir)\UnityStubs.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Waylith"><HintPath>$(RimWorldDir)\Waylith.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Waylith.UnityCompat"><HintPath>$(RimWorldDir)\Waylith.UnityCompat.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(HarmonyPath)</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>
+

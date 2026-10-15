@@ -1,0 +1,5 @@
+Source/obj/
+Source/bin/
+dist/
+Tests/bin/
+Tests/obj/
