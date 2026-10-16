@@ -13,6 +13,7 @@ public sealed class MonitorSettings : ModSettings
     public int CameraFps = 2;
     public int MinimapInterval = 2;
     public bool ShowMarkers = true;
+    public bool ShowViewport = true;
     public bool ShowWeather = true;
     public bool Enabled;
     public bool Docked;
@@ -34,6 +35,7 @@ public sealed class MonitorSettings : ModSettings
         Scribe_Values.Look(ref CameraFps, "cameraFps", 2);
         Scribe_Values.Look(ref MinimapInterval, "minimapInterval", 2);
         Scribe_Values.Look(ref ShowMarkers, "showMarkers", true);
+        Scribe_Values.Look(ref ShowViewport, "showViewport", true);
         Scribe_Values.Look(ref ShowWeather, "showWeather", true);
         Scribe_Values.Look(ref Enabled, "enabled", false);
         Scribe_Values.Look(ref Docked, "docked", false);

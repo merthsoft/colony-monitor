@@ -13,7 +13,7 @@ Click the monitor icon in the lower-right corner to show or hide it. Right-click
 
 Click the picture to jump to that location. In camera mode, scroll to zoom and right-drag to pan. Use **Center** or **Follow colonist** from the window or icon menu. Each map remembers its camera view.
 
-Markers: green for colonists, yellow for downed colonists, red for hostiles.
+Markers: green for colonists, yellow for downed colonists, red for hostiles. A gray rectangle shows your viewport when watching the current map; turn it off with Current viewport in settings.
 
 ## Settings
 
@@ -23,7 +23,7 @@ Choose the display style, dock corner and size, picture quality, markers, weathe
 
 ## Limits
 
-Only loaded maps can be watched. The monitor does not change simulation speed. Camera mode may differ from the main view in saturation, water reflections, and some effects. If it fails, it switches to Minimap; use **Refresh preview** to retry.
+Only loaded maps can be watched. The monitor does not change simulation speed. Camera mode may differ from the main view in saturation and some effects. If it fails, it switches to Minimap; use **Refresh preview** to retry.
 
 ## Build
 

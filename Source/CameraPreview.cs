@@ -18,6 +18,7 @@ public sealed class CameraPreview : IDisposable
     private RenderTexture target;
     private readonly PreviewEnvironment environment = new();
     private readonly PreviewDrawOrder drawOrder = new();
+    private readonly PreviewWater water = new();
     public RenderTexture Texture => target;
     public int DrawCount { get; private set; }
     public Rect WorldRect { get; private set; }
@@ -52,6 +53,7 @@ public sealed class CameraPreview : IDisposable
             }
             environment.Apply(commands);
             drawOrder.Apply(commands);
+            water.Render(map, camera, commands, Find.Camera.cullingMask);
             DrawCount = commands.Count;
 
             CameraTextureRenderer.Current.Render(target, commands, CameraViewFactory.GetView(camera),
@@ -108,6 +110,7 @@ public sealed class CameraPreview : IDisposable
     public void Dispose()
     {
         ReleaseTarget();
+        water.Dispose();
         if (cameraObject != null) UnityEngine.Object.Destroy(cameraObject);
         cameraObject = null;
         camera = null;

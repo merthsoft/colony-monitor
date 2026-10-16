@@ -35,6 +35,20 @@ internal static class Program
         var map = (Map)RuntimeHelpers.GetUninitializedObject(typeof(Map));
         new Harmony("Merthsoft.ColonyMonitor.CameraChecks").PatchAll();
         Check(!PreviewContext.Active, "context initially inactive");
+        var viewport = ViewportOverlay.Project(new Rect(20, 30, 40, 20), new Rect(0, 0, 100, 100), new Rect(10, 20, 200, 200));
+        Check(viewport == new Rect(50, 120, 80, 40), "viewport overlay maps world coordinates with north at the top");
+        viewport = ViewportOverlay.Project(new Rect(10, 30, 40, 20), new Rect(20, 20, 40, 40), new Rect(0, 0, 200, 200));
+        Check(viewport == new Rect(-50, 50, 200, 100), "viewport overlay preserves offscreen edges for clipping in camera view");
+        var waterDraws = new List<MeshDrawCommand>();
+        var visibleDraws = new List<MeshDrawCommand>();
+        foreach (int layer in new[] { 0, 4, 0, 7, 4 })
+            visibleDraws.Add(new MeshDrawCommand(null, null, default, System.Numerics.Matrix4x4.Identity,
+                visibleDraws.Count, 0, null, 2000, layer, null));
+        PreviewWater.Split(visibleDraws, waterDraws, 4, 1);
+        Check(visibleDraws.Count == 2 && visibleDraws[0].SubmeshIndex == 0 && visibleDraws[1].SubmeshIndex == 2,
+            "water depth and excluded camera layers never enter the visible preview");
+        Check(waterDraws.Count == 2 && waterDraws[0].SubmeshIndex == 1 && waterDraws[1].SubmeshIndex == 4,
+            "water depth commands retain order in their separate pass");
         var floating = MonitorLayout.FloatingRect(new Rect(0, 0, 390, 440), new Vector2(120, 80), 1280, 720);
         Check(floating.position == new Vector2(120, 80), "floating window restores its saved position");
         floating = MonitorLayout.FloatingRect(floating, new Vector2(1200, 700), 1024, 600);

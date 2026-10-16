@@ -78,6 +78,7 @@ internal sealed class MonitorSettingsPanel
             Choice(list, "Refresh interval", $"{settings.MinimapInterval}s", new[] { 1, 2, 5, 10 }
                 .Select(value => new FloatMenuOption($"{value}s", () => settings.MinimapInterval = value)));
         list.CheckboxLabeled("Pawn markers", ref settings.ShowMarkers);
+        list.CheckboxLabeled("Current viewport", ref settings.ShowViewport);
 
         Header(list, "Monitor icon");
         string[] locations = { "Play-settings row", "Above time controls", "Hidden" };

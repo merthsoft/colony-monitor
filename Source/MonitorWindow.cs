@@ -306,6 +306,9 @@ public sealed class MonitorWindow : Window
                 GUI.DrawTextureWithTexCoords(destination, texture, uv);
         }
         else GUI.DrawTexture(image, texture);
+        if (ColonyMonitorMod.Settings.ShowViewport && selected == Find.CurrentMap
+            && RimWorld.Planet.WorldRendererUtility.DrawingMap)
+            ViewportOverlay.Draw(Find.Camera, world, image);
         int hostiles = 0, downed = 0;
         foreach (var pawn in selected.mapPawns.AllPawnsSpawned)
         {
