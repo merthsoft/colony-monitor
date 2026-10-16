@@ -12,17 +12,40 @@ public sealed class MonitorWindow : Window
     private Texture2D preview;
     private Color[] pixels;
     private float refreshedAt = -100f;
-    private double refreshMilliseconds;
     private bool failed;
     private int width, height;
     private readonly CameraPreview cameraPreview = new();
     private PreviewMode appliedMode;
     private int appliedResolution;
     private bool cameraFailed;
-    private Vector2 cameraCenter;
-    private float cameraSize = 40f;
-    private string cameraError;
-    public override Vector2 InitialSize => new(390f, 500f);
+    private CameraViewState view;
+    private MonitorGameComponent gameState;
+    private bool panning;
+    private int panControl;
+    private readonly PreviewInteraction pan = new();
+    private bool previewPress;
+    private Vector2 previewPressPosition;
+    private int previewControl;
+    private bool wasDocked;
+    private Rect floatingRect;
+    private bool followedCurrentMap;
+    private bool Docked => ColonyMonitorMod.Settings.Docked;
+    private bool FollowsCurrentMap => Docked ? ColonyMonitorMod.Settings.DockCurrentMapOnly : ColonyMonitorMod.Settings.CurrentMapOnly;
+    protected override float Margin => Docked ? 0f : 18f;
+    public override Vector2 InitialSize => new(390f, 440f);
+
+    internal static bool BlocksMainCameraMotion()
+    {
+        if (Current.Game == null)
+            return false;
+
+        var pointer = UI.MousePositionOnUIInverted;
+        return Find.WindowStack.Windows.OfType<MonitorWindow>()
+            .Any(window => window.OwnsCameraInput(pointer));
+    }
+
+    internal bool OwnsCameraInput(Vector2 pointer)
+        => panning || previewPress || windowRect.Contains(pointer);
 
     public MonitorWindow()
     {
@@ -32,17 +55,37 @@ public sealed class MonitorWindow : Window
         absorbInputAroundWindow = false;
         preventCameraMotion = false;
         closeOnAccept = false;
-        selected = Find.Maps.FirstOrDefault(m => m.IsPlayerHome && m != Find.CurrentMap)
+        ColonyMonitorMod.Settings.Enabled = true;
+        gameState = Current.Game.GetComponent<MonitorGameComponent>();
+        var initial = Find.Maps.FirstOrDefault(m => m.uniqueID == gameState.SelectedMapId)
+            ?? Find.Maps.FirstOrDefault(m => m.IsPlayerHome && m != Find.CurrentMap)
             ?? Find.Maps.FirstOrDefault(m => m != Find.CurrentMap) ?? Find.CurrentMap;
-        if (selected != null) CenterCamera();
+        if (initial != null) SelectMap(initial);
     }
 
     public override void WindowUpdate()
     {
         base.WindowUpdate();
         if (Current.Game == null || Find.Maps.Count == 0) { Close(); return; }
-        if (!Find.Maps.Contains(selected)) SelectMap(Find.Maps[0]);
         var settings = ColonyMonitorMod.Settings;
+        if (FollowsCurrentMap && Find.CurrentMap != null && selected != Find.CurrentMap)
+            SelectMap(Find.CurrentMap);
+        if (followedCurrentMap && !FollowsCurrentMap)
+        {
+            var remembered = Find.Maps.FirstOrDefault(m => m.uniqueID == gameState.SelectedMapId);
+            if (remembered != null && remembered != selected) SelectMap(remembered);
+        }
+        followedCurrentMap = FollowsCurrentMap;
+        ApplyLayout(settings);
+        if (!Find.Maps.Contains(selected)) SelectMap(Find.Maps[0]);
+        // Recover mouse-up lost outside the game.
+        if (panning && !Input.GetMouseButton(1)) EndPan();
+        if (view.Follow != null)
+        {
+            if (view.Follow.Spawned && view.Follow.Map == selected && !view.Follow.Dead)
+                view.Center = new Vector2(view.Follow.DrawPos.x, view.Follow.DrawPos.z);
+            else view.Follow = null;
+        }
         if (appliedMode != settings.Mode || appliedResolution != settings.CameraResolution)
         {
             ReleaseTexture();
@@ -59,9 +102,7 @@ public sealed class MonitorWindow : Window
             {
                 if (UseCamera)
                 {
-                    var timer = System.Diagnostics.Stopwatch.StartNew();
-                    cameraPreview.Refresh(selected, cameraCenter, cameraSize, settings.CameraResolution);
-                    refreshMilliseconds = timer.Elapsed.TotalMilliseconds;
+                    cameraPreview.Refresh(selected, view.Center, view.Size, settings.CameraResolution);
                 }
                 else Refresh();
             }
@@ -70,7 +111,6 @@ public sealed class MonitorWindow : Window
                 if (UseCamera)
                 {
                     cameraFailed = true;
-                    cameraError = ex.Message;
                     cameraPreview.Dispose();
                     refreshedAt = -100f;
                     Log.Warning("[Colony Monitor] Camera failed; falling back to minimap: " + ex);
@@ -84,30 +124,93 @@ public sealed class MonitorWindow : Window
         }
     }
 
+    public override void PostOpen()
+    {
+        base.PostOpen();
+        var position = ColonyMonitorMod.Settings.FloatingPosition;
+        if (position.x >= 0 && position.y >= 0)
+            windowRect = MonitorLayout.FloatingRect(windowRect, position, UI.screenWidth, UI.screenHeight);
+    }
+
     private void SelectMap(Map map)
     {
+        EndPan();
+        previewPress = false;
         selected = map;
+        if (!FollowsCurrentMap) gameState.SelectedMapId = map.uniqueID;
+        view = gameState.GetView(map, out var created);
         ReleaseTexture();
         failed = false;
         cameraFailed = false;
-        CenterCamera();
+        if (created) CenterCamera();
         refreshedAt = -100f;
     }
 
     private bool UseCamera => ColonyMonitorMod.Settings.Mode == PreviewMode.Camera && !cameraFailed;
 
+    private void ApplyLayout(MonitorSettings settings)
+    {
+        if (settings.Docked && !wasDocked)
+        {
+            floatingRect = windowRect;
+            settings.FloatingPosition = windowRect.position;
+        }
+        if (!settings.Docked && wasDocked)
+            windowRect = MonitorLayout.FloatingRect(floatingRect, floatingRect.position, UI.screenWidth, UI.screenHeight);
+        if (settings.Docked)
+            windowRect = MonitorLayout.DockRect(UI.screenWidth, UI.screenHeight, settings.DockSize,
+                settings.DockCorner, settings.DockInsetX, settings.DockInsetY);
+        doCloseX = draggable = doWindowBackground = drawShadow = !settings.Docked;
+        layer = settings.Docked ? WindowLayer.GameUI : WindowLayer.Dialog;
+        closeOnCancel = !settings.Docked;
+        wasDocked = settings.Docked;
+    }
+
+    internal void ShowMapMenu()
+    {
+        var settings = ColonyMonitorMod.Settings;
+        var choices = Find.Maps.Select(m =>
+            new FloatMenuOption($"{m.Parent.LabelCap} - {m.mapPawns.FreeColonistsSpawnedCount} colonists"
+                + (m == Find.CurrentMap ? " (current)" : ""), () =>
+                {
+                    if (Docked) settings.DockCurrentMapOnly = false;
+                    else settings.CurrentMapOnly = false;
+                    SelectMap(m);
+                    ColonyMonitorMod.Instance.WriteSettings();
+                })).ToList();
+        choices.Insert(0, new FloatMenuOption("Follow current map", () =>
+        {
+            if (Docked) settings.DockCurrentMapOnly = true;
+            else settings.CurrentMapOnly = true;
+            ColonyMonitorMod.Instance.WriteSettings();
+        }));
+        Find.WindowStack.Add(new FloatMenu(choices));
+    }
+
+    internal void Zoom(float factor)
+    {
+        view.Zoom(factor, new Vector2(0.5f, 0.5f), selected.Size);
+        refreshedAt = -100f;
+    }
+
+    internal void RetryPreview()
+    {
+        cameraFailed = failed = false;
+        refreshedAt = -100f;
+    }
+
     private void CenterCamera()
     {
         var colonists = selected.mapPawns.FreeColonistsSpawned;
-        cameraCenter = colonists.Count == 0 ? new Vector2(selected.Size.x / 2f, selected.Size.z / 2f)
+        view.Follow = null;
+        view.Center = colonists.Count == 0 ? new Vector2(selected.Size.x / 2f, selected.Size.z / 2f)
             : new Vector2((float)colonists.Average(p => p.Position.x), (float)colonists.Average(p => p.Position.z));
         refreshedAt = -100f;
     }
 
     private void Refresh()
     {
-        var timer = System.Diagnostics.Stopwatch.StartNew();
-        // One pixel per cell preserves walls even on large maps. Only this map is cached.
+
         if (preview == null)
         {
             width = selected.Size.x;
@@ -127,8 +230,7 @@ public sealed class MonitorWindow : Window
             else
             {
                 var terrain = selected.terrainGrid.TerrainAt(cell);
-                // Most terrain graphics use white tint over a texture. Use a readable
-                // schematic palette rather than treating that tint as the terrain image.
+                // Terrain tint is usually white; it does not represent texture color.
                 color = TerrainColor(terrain);
                 var building = cell.GetEdifice(selected);
                 if (building != null)
@@ -140,7 +242,6 @@ public sealed class MonitorWindow : Window
         }
         preview.SetPixels(pixels);
         preview.Apply(false, false);
-        refreshMilliseconds = timer.Elapsed.TotalMilliseconds;
     }
 
     private static Color TerrainColor(TerrainDef terrain)
@@ -156,37 +257,55 @@ public sealed class MonitorWindow : Window
 
     public override void DoWindowContents(Rect rect)
     {
-        Widgets.Label(new Rect(0, 0, rect.width - 25, 28), "Colony Monitor - prototype");
+        if (Docked)
+        {
+            DrawPreview(rect);
+            return;
+        }
         if (selected == null || !Find.Maps.Contains(selected)) return;
-        if (Widgets.ButtonText(new Rect(0, 34, rect.width, 28), selected.Parent.LabelCap))
-            Find.WindowStack.Add(new FloatMenu(Find.Maps.Select(m =>
-                new FloatMenuOption(m.Parent.LabelCap + (m == Find.CurrentMap ? " (viewing)" : ""),
-                    () => SelectMap(m))).ToList()));
+        if (Widgets.ButtonText(new Rect(0, 0, rect.width - 26, 28), selected.Parent.LabelCap))
+            ShowMapMenu();
 
-        if (Widgets.ButtonText(new Rect(0, 68, rect.width - 94, 28),
-            UseCamera ? "Mode: Camera" : "Mode: Minimap" + (cameraFailed ? " (fallback)" : "")))
+        if (Widgets.ButtonText(new Rect(0, 34, rect.width - 94, 28),
+            UseCamera ? "Camera" : "Minimap" + (cameraFailed ? " (camera unavailable)" : "")))
         {
             ColonyMonitorMod.Settings.Mode = UseCamera ? PreviewMode.Minimap : PreviewMode.Camera;
             cameraFailed = false;
+            EndPan();
             refreshedAt = -100f;
             ColonyMonitorMod.Instance.WriteSettings();
         }
-        if (Widgets.ButtonText(new Rect(rect.width - 88, 68, 88, 28), "Settings"))
+        if (Widgets.ButtonText(new Rect(rect.width - 88, 34, 88, 28), "Settings"))
             Find.WindowStack.Add(new MonitorSettingsWindow());
-        var area = new Rect(0, 102, rect.width, 280);
+        var area = new Rect(0, 68, rect.width, 280);
+        DrawPreview(area);
+    }
+
+    private void DrawPreview(Rect area)
+    {
+        if (selected == null || !Find.Maps.Contains(selected)) return;
         Widgets.DrawBoxSolid(area, Color.black);
         if (failed)
         {
-            Widgets.Label(area.ContractedBy(10), "Preview failed. See the log; select a map to retry.");
+            Widgets.Label(area.ContractedBy(10), "Preview unavailable. Use Refresh preview in the monitor menu.");
             return;
         }
         Texture texture = UseCamera ? cameraPreview.Texture : preview;
         if (texture == null) { Widgets.Label(area.ContractedBy(10), "Preparing preview..."); return; }
-        var world = UseCamera ? cameraPreview.WorldRect : new Rect(0, 0, width, height);
+        var world = UseCamera ? new Rect(view.Center.x - view.Size, view.Center.y - view.Size, view.Size * 2, view.Size * 2)
+            : new Rect(0, 0, width, height);
         float scale = Math.Min(area.width / world.width, area.height / world.height);
         var image = new Rect(area.x + (area.width - world.width * scale) / 2,
             area.y + (area.height - world.height * scale) / 2, world.width * scale, world.height * scale);
-        GUI.DrawTexture(image, texture);
+        HandlePreviewInput(image, world, scale);
+        if (UseCamera)
+        {
+            world = new Rect(view.Center.x - view.Size, view.Center.y - view.Size, view.Size * 2, view.Size * 2);
+            scale = image.width / world.width;
+            if (PreviewInteraction.ProjectCachedImage(cameraPreview.WorldRect, world, image, out var destination, out var uv))
+                GUI.DrawTextureWithTexCoords(destination, texture, uv);
+        }
+        else GUI.DrawTexture(image, texture);
         int hostiles = 0, downed = 0;
         foreach (var pawn in selected.mapPawns.AllPawnsSpawned)
         {
@@ -203,37 +322,22 @@ public sealed class MonitorWindow : Window
             Widgets.DrawBoxSolid(point, color);
             TooltipHandler.TipRegion(point.ExpandedBy(2), pawn.LabelShortCap);
         }
-        TooltipHandler.TipRegion(image, "Click to jump here. Green: colonists; yellow: downed; red: hostiles.");
-        if (Widgets.ButtonInvisible(image))
+        TooltipHandler.TipRegion(image, UseCamera
+            ? "Scroll to zoom. Right-drag to pan. Click to jump. Green: colonists; yellow: downed; red: hostiles."
+            : "Click to jump. Green: colonists; yellow: downed; red: hostiles.");
+        if (Docked)
         {
-            var mouse = Event.current.mousePosition;
-            var cell = new IntVec3(Mathf.Clamp((int)(world.x + (mouse.x - image.x) / scale), 0, selected.Size.x - 1), 0,
-                Mathf.Clamp((int)(world.y + (image.yMax - mouse.y) / scale), 0, selected.Size.z - 1));
-            CameraJumper.TryJump(cell, selected);
+            TooltipHandler.TipRegion(area, $"{selected.Parent.LabelCap}. Right-click the monitor icon for controls.");
+            return;
         }
-        Widgets.Label(new Rect(0, 388, rect.width, 24),
+        Widgets.Label(new Rect(0, 354, area.width, 24),
             $"Colonists: {selected.mapPawns.FreeColonistsSpawnedCount}   Downed: {downed}   Hostiles: {hostiles}");
-        Widgets.Label(new Rect(0, 412, rect.width, 26), UseCamera
-            ? $"{ColonyMonitorMod.Settings.CameraResolution}px / {ColonyMonitorMod.Settings.CameraFps} FPS | {refreshMilliseconds:0.0} ms CPU"
-            : $"{ColonyMonitorMod.Settings.MinimapInterval}s background | {refreshMilliseconds:0.0} ms refresh");
-        if (cameraFailed)
-            TooltipHandler.TipRegion(area, "Camera unavailable: " + cameraError + ". Click Mode to retry.");
         if (UseCamera)
         {
-            if (Widgets.ButtonText(new Rect(0, 440, 32, 24), "-")) { cameraSize = Math.Min(150, cameraSize * 1.3f); refreshedAt = -100f; }
-            if (Widgets.ButtonText(new Rect(36, 440, 32, 24), "+")) { cameraSize = Math.Max(8, cameraSize / 1.3f); refreshedAt = -100f; }
-            if (Widgets.ButtonText(new Rect(74, 440, 90, 24), "Colonists")) CenterCamera();
-            if (Widgets.ButtonText(new Rect(170, 440, rect.width - 170, 24), "Use main view"))
-            {
-                if (selected == Find.CurrentMap)
-                {
-                    var position = Find.CameraDriver.MapPosition;
-                    cameraCenter = new Vector2(position.x, position.z);
-                    cameraSize = Find.CameraDriver.RootSize;
-                    refreshedAt = -100f;
-                }
-                else Messages.Message("Switch to the monitored map first to copy its camera position.", MessageTypeDefOf.RejectInput, false);
-            }
+            if (Widgets.ButtonText(new Rect(0, 380, 32, 24), "-")) view.Zoom(1.3f, new Vector2(0.5f, 0.5f), selected.Size);
+            if (Widgets.ButtonText(new Rect(36, 380, 32, 24), "+")) view.Zoom(1 / 1.3f, new Vector2(0.5f, 0.5f), selected.Size);
+            if (Widgets.ButtonText(new Rect(74, 380, 90, 24), "Center")) ShowCenterMenu();
+            if (Widgets.ButtonText(new Rect(170, 380, area.width - 170, 24), view.Follow == null ? "Follow colonist" : "Following: " + view.Follow.LabelShortCap)) ShowFollowMenu();
         }
     }
 
@@ -247,7 +351,106 @@ public sealed class MonitorWindow : Window
 
     public override void PostClose()
     {
+        EndPan();
         ReleaseTexture();
+        if (Current.Game != null)
+        {
+            if (!wasDocked) ColonyMonitorMod.Settings.FloatingPosition = windowRect.position;
+            ColonyMonitorMod.Settings.Enabled = false;
+            ColonyMonitorMod.Instance.WriteSettings();
+        }
         base.PostClose();
+    }
+
+    internal void ShowCenterMenu()
+    {
+        var choices = new System.Collections.Generic.List<FloatMenuOption>
+        {
+            new("Colonists", CenterCamera),
+            new("Map center", () => { view.Follow = null; view.Center = new Vector2(selected.Size.x / 2f, selected.Size.z / 2f); })
+        };
+        choices.Add(selected == Find.CurrentMap ? new FloatMenuOption("Use main view", () =>
+        {
+            view.Follow = null;
+            var position = Find.CameraDriver.MapPosition;
+            view.Center = new Vector2(position.x, position.z);
+            view.Size = Find.CameraDriver.RootSize;
+            view.Clamp(selected.Size);
+        }) : new FloatMenuOption("Use main view (switch to this map first)", null));
+        Find.WindowStack.Add(new FloatMenu(choices));
+    }
+
+    internal void ShowFollowMenu()
+    {
+        var choices = new System.Collections.Generic.List<FloatMenuOption> { new("Stop following", () => view.Follow = null) };
+        choices.AddRange(selected.mapPawns.FreeColonistsSpawned.OrderBy(p => p.LabelShortCap.ToString())
+            .Select(p => new FloatMenuOption(p.LabelShortCap, () => view.Follow = p)));
+        Find.WindowStack.Add(new FloatMenu(choices));
+    }
+
+    private void EndPan()
+    {
+        bool wasPanning = panning;
+        if (panning && GUIUtility.hotControl == panControl) GUIUtility.hotControl = 0;
+        panning = false;
+        if (previewPress && GUIUtility.hotControl == previewControl) GUIUtility.hotControl = 0;
+        previewPress = false;
+        if (wasPanning) refreshedAt = -100f;
+    }
+
+    private void HandlePreviewInput(Rect image, Rect world, float scale)
+    {
+        var ev = Event.current;
+        int control = GUIUtility.GetControlID(FocusType.Passive);
+        bool inside = image.Contains(ev.mousePosition);
+        if (UseCamera && ev.type == EventType.ScrollWheel && inside)
+        {
+            view.Zoom(Mathf.Pow(1.15f, Mathf.Clamp(ev.delta.y, -5, 5)),
+                new Vector2((ev.mousePosition.x - image.x) / image.width, (ev.mousePosition.y - image.y) / image.height), selected.Size);
+            ev.Use();
+        }
+        if (UseCamera && ev.type == EventType.MouseDown && ev.button == 1 && inside)
+        {
+            panning = true;
+            panControl = control;
+            GUIUtility.hotControl = control;
+            pan.Begin(ev.mousePosition);
+            view.Follow = null;
+            previewPress = false;
+            ev.Use();
+        }
+        if (panning && (ev.rawType == EventType.MouseDrag || ev.rawType == EventType.MouseMove))
+        {
+            pan.Move(ev.mousePosition, view, image.width, selected.Size);
+            ev.Use();
+        }
+        if (panning && ev.rawType == EventType.MouseUp && ev.button == 1)
+        {
+            pan.Move(ev.mousePosition, view, image.width, selected.Size);
+            EndPan();
+            ev.Use();
+        }
+        // Retain the gesture through mouse-up to block main-map orders.
+        if (ev.type == EventType.MouseDown && ev.button == 0 && inside)
+        {
+            previewPress = true;
+            previewControl = control;
+            GUIUtility.hotControl = control;
+            previewPressPosition = ev.mousePosition;
+            ev.Use();
+        }
+        if (previewPress && ev.type == EventType.MouseDrag) ev.Use();
+        if (previewPress && ev.rawType == EventType.MouseUp && ev.button == 0)
+        {
+            previewPress = false;
+            if (GUIUtility.hotControl == previewControl) GUIUtility.hotControl = 0;
+            if (inside && (ev.mousePosition - previewPressPosition).sqrMagnitude < 25)
+            {
+                var cell = new IntVec3(Mathf.Clamp((int)(world.x + (ev.mousePosition.x - image.x) / scale), 0, selected.Size.x - 1), 0,
+                    Mathf.Clamp((int)(world.y + (image.yMax - ev.mousePosition.y) / scale), 0, selected.Size.z - 1));
+                CameraJumper.TryJump(cell, selected);
+            }
+            ev.Use();
+        }
     }
 }

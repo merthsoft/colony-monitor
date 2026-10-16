@@ -20,7 +20,23 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Source\CameraPreview.cs" Link="CameraPreview.cs" />
+    <Compile Include="..\Source\PreviewEnvironment.cs" Link="PreviewEnvironment.cs" />
+    <Compile Include="..\Source\PreviewWeatherLayers.cs" Link="PreviewWeatherLayers.cs" />
+    <Compile Include="..\Source\PreviewDrawProperties.cs" Link="PreviewDrawProperties.cs" />
+    <Compile Include="..\Source\PreviewDrawOrder.cs" Link="PreviewDrawOrder.cs" />
+    <Compile Include="..\Source\PreviewContext.cs" Link="PreviewContext.cs" />
+    <Compile Include="..\Source\Patches\*.cs" Exclude="..\Source\Patches\PlaySettings_DoPlaySettingsGlobalControls.cs" Link="Patches\%(Filename)%(Extension)" />
+    <Compile Include="..\Source\CameraViewState.cs" Link="CameraViewState.cs" />
+    <Compile Include="..\Source\PreviewInteraction.cs" Link="PreviewInteraction.cs" />
+    <Compile Include="..\Source\MonitorGameComponent.cs" Link="MonitorGameComponent.cs" />
+    <Compile Include="..\Source\MonitorWindow.cs" Link="MonitorWindow.cs" />
+    <Compile Include="..\Source\MonitorLayout.cs" Link="MonitorLayout.cs" />
+    <Compile Include="..\Source\MonitorToggle.cs" Link="MonitorToggle.cs" />
+    <Compile Include="..\Source\MonitorMenu.cs" Link="MonitorMenu.cs" />
+    <Compile Include="..\Source\MonitorSettingsWindow.cs" Link="MonitorSettingsWindow.cs" />
+    <Compile Include="..\Source\ColonyMonitorMod.cs" Link="ColonyMonitorMod.cs" />
     <Compile Include="..\Source\MonitorSettings.cs" Link="MonitorSettings.cs" />
+    <Compile Include="..\Source\MonitorSettingsPanel.cs" Link="MonitorSettingsPanel.cs" />
     <Reference Include="Assembly-CSharp"><HintPath>$(RimWorldDir)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityStubs"><HintPath>$(RimWorldDir)\UnityStubs.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Waylith"><HintPath>$(RimWorldDir)\Waylith.dll</HintPath><Private>false</Private></Reference>

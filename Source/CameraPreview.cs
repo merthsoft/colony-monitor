@@ -9,15 +9,15 @@ using RenderTexture = UnityEngine.RenderTexture;
 
 namespace Merthsoft.ColonyMonitor;
 
-// 1.7's capture scope routes submissions into a private command list instead of
-// the screen queue. Render that list directly: Camera.Render() would also copy
-// pending commands belonging to the main map.
+// Camera.Render() also copies pending main-map commands.
 public sealed class CameraPreview : IDisposable
 {
     private readonly List<MeshDrawCommand> commands = new();
     private GameObject cameraObject;
     private Camera camera;
     private RenderTexture target;
+    private readonly PreviewEnvironment environment = new();
+    private readonly PreviewDrawOrder drawOrder = new();
     public RenderTexture Texture => target;
     public int DrawCount { get; private set; }
     public Rect WorldRect { get; private set; }
@@ -37,25 +37,30 @@ public sealed class CameraPreview : IDisposable
         bool singleThreadedDrawing = DebugViewSettings.singleThreadedDrawing;
         try
         {
-            // Pawn pre-draw jobs can consult map/camera getters. Keep this small
-            // preview on the scoped thread, rather than exposing context to workers.
+            // Worker threads cannot see PreviewContext.
             DebugViewSettings.singleThreadedDrawing = true;
+            bool showWeather = ColonyMonitorMod.Settings.ShowWeather;
+            environment.Prepare(map, camera, showWeather);
             using (new PreviewContext(map, camera, WorldRect, size))
             using (MeshDrawSubmission.BeginCapture(commands))
             {
                 map.mapDrawer.MapMeshDrawerUpdate_First();
                 map.mapDrawer.DrawMapMesh();
                 map.dynamicDrawManager.DrawDynamicThings();
+                if (showWeather)
+                    environment.DrawWeather(map);
             }
+            environment.Apply(commands);
+            drawOrder.Apply(commands);
             DrawCount = commands.Count;
-            // Submit immediately, while per-draw property ranges are still valid.
+
             CameraTextureRenderer.Current.Render(target, commands, CameraViewFactory.GetView(camera),
                 new Rect(0, 0, 1, 1), Color.black);
         }
         finally
         {
             DebugViewSettings.singleThreadedDrawing = singleThreadedDrawing;
-            // Commands reference frame-owned material properties; never retain them.
+            // Property ranges expire with the frame.
             commands.Clear();
         }
     }
@@ -93,7 +98,7 @@ public sealed class CameraPreview : IDisposable
     private void ReleaseTarget()
     {
         if (target == null) return;
-        camera?.targetTexture = null;
+        if (camera != null) camera.targetTexture = null;
         CameraTextureRenderer.Current?.ReleaseTarget(target);
         target.Release();
         UnityEngine.Object.Destroy(target);

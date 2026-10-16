@@ -4,8 +4,7 @@ using Verse;
 
 namespace Merthsoft.ColonyMonitor;
 
-// Scope getter overrides to this thread and this synchronous draw only. Do not
-// assign CurrentMap: its setter changes selection, camera state and map events.
+// CurrentMap assignment also changes selection, camera state, and map events.
 internal sealed class PreviewContext : IDisposable
 {
     [ThreadStatic] internal static PreviewContext Current;

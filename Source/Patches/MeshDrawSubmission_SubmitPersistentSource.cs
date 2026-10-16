@@ -4,9 +4,7 @@ using MeshDrawSubmission = Waylith.Rendering.MeshDrawSubmission;
 
 namespace Merthsoft.ColonyMonitor.Patches;
 
-// A mod may submit a persistent source outside the normal mesh queue. The
-// engine's BeginCapture does not capture those sources. Fail closed rather
-// than allowing the other map's geometry into the screen renderer.
+// BeginCapture does not isolate persistent sources from the main render queue.
 [HarmonyPatch(typeof(MeshDrawSubmission), nameof(MeshDrawSubmission.SubmitPersistentSource))]
 internal static class MeshDrawSubmission_SubmitPersistentSource
 {

@@ -2,8 +2,9 @@
   <name>Colony Monitor</name>
   <author>merthsoft</author>
   <packageId>Merthsoft.ColonyMonitor</packageId>
+  <modIconPath>UI/ColonyMonitor/Monitor</modIconPath>
   <supportedVersions><li>1.7</li></supportedVersions>
-  <description>A floating colony monitor with a lightweight minimap or an experimental full-graphics camera. Choose camera resolution and refresh rate to suit your hardware. Includes pawn markers and click-to-jump navigation.</description>
+  <description>Watch a loaded colony or camp in a floating window or docked minimap. Choose a simple map or full camera view, with adjustable quality, pawn markers, and camera controls.</description>
   <modDependencies><li><packageId>brrainz.harmony</packageId><displayName>Harmony</displayName></li></modDependencies>
   <loadAfter><li>brrainz.harmony</li></loadAfter>
 </ModMetaData>

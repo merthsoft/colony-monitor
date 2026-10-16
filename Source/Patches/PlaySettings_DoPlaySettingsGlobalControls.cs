@@ -1,4 +1,3 @@
-using System.Linq;
 using HarmonyLib;
 using RimWorld;
 using Verse;
@@ -10,17 +9,12 @@ public static class PlaySettings_DoPlaySettingsGlobalControls
 {
     public static void Postfix(WidgetRow row)
     {
-        if (Current.Game == null || Find.Maps.Count == 0)
+        if (!MonitorToggle.Available || ColonyMonitorMod.Settings.ButtonLocation != 0)
             return;
-
-        if (!row.ButtonText("Monitor"))
-            return;
-
-        var window = Find.WindowStack.Windows.OfType<MonitorWindow>().FirstOrDefault();
-        
-        if (window != null) 
-            window.Close();
-        else 
-            Find.WindowStack.Add(new MonitorWindow());
+        bool enabled = ColonyMonitorMod.Settings.Enabled;
+        bool previous = enabled;
+        MonitorMenu.HandleInput(row.ButtonIconRect(24f));
+        row.ToggleableIcon(ref enabled, MonitorToggle.Icon, "Colony Monitor: click to show / hide; right-click for controls");
+        if (enabled != previous) MonitorToggle.SetVisible(enabled);
     }
 }
