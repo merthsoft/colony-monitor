@@ -35,6 +35,30 @@ internal static class Program
         var map = (Map)RuntimeHelpers.GetUninitializedObject(typeof(Map));
         new Harmony("Merthsoft.ColonyMonitor.CameraChecks").PatchAll();
         Check(!PreviewContext.Active, "context initially inactive");
+        var stack = (WindowStack)RuntimeHelpers.GetUninitializedObject(typeof(WindowStack));
+        var lower = (MonitorSettingsWindow)RuntimeHelpers.GetUninitializedObject(typeof(MonitorSettingsWindow));
+        var dialog = (MonitorSettingsWindow)RuntimeHelpers.GetUninitializedObject(typeof(MonitorSettingsWindow));
+        var reorderMonitor = (MonitorWindow)RuntimeHelpers.GetUninitializedObject(typeof(MonitorWindow));
+        lower.layer = WindowLayer.GameUI;
+        dialog.layer = reorderMonitor.layer = WindowLayer.Dialog;
+        var windows = new List<Window> { lower, dialog, reorderMonitor };
+        AccessTools.Field(typeof(WindowStack), "windows").SetValue(stack, windows);
+        AccessTools.Field(typeof(WindowStack), "focusedWindow").SetValue(stack, dialog);
+        MonitorWindowOrder.SetLayer(reorderMonitor, WindowLayer.GameUI, stack);
+        Check(windows.Count == 3 && windows[1] == reorderMonitor && windows[2] == dialog,
+            "docking reinserts the existing monitor below dialogs without closing it");
+        Check(ReferenceEquals(AccessTools.Field(typeof(WindowStack), "focusedWindow").GetValue(stack), dialog),
+            "reordering the monitor preserves the focused dialog");
+        MonitorWindowOrder.SetLayer(reorderMonitor, WindowLayer.Dialog, stack);
+        Check(windows.Count == 3 && windows[2] == reorderMonitor,
+            "undocking restores the floating monitor to the dialog layer");
+        var shadowColor = new Color(0.2f, 0.3f, 0.4f, 0.8f);
+        PreviewShadows.Resolve(new Vector2(3, 4), null, shadowColor, 0.25f, out var shadowDirection, out var shadowTint);
+        Check(shadowDirection == new System.Numerics.Vector4(3, 0, 4, 0.25f)
+            && shadowTint == Color.Lerp(Color.white, shadowColor, 0.25f), "normal shadows retain celestial direction and strength attenuation");
+        PreviewShadows.Resolve(new Vector2(3, 4), new Vector3(7, 9, 0), shadowColor, 0.25f, out shadowDirection, out shadowTint);
+        Check(shadowDirection == new System.Numerics.Vector4(7, 0, 9, 0.25f) && shadowTint == shadowColor,
+            "lightning shadows use the override vector and unattenuated sky shadow color");
         var navigationImage = new Rect(800, 100, 200, 200);
         var navigationWorld = new Rect(0, 0, 325, 325);
         var navigationSize = new IntVec3(325, 1, 325);

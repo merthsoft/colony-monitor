@@ -35,14 +35,15 @@ internal sealed class PreviewEnvironment
         skyColor.a = 1;
         AddColor(MatBases.FogOfWar, unlit ? fogColor : skyColor * fogColor);
         float strength = GenCelestial.CurShadowStrength(map);
-        var shadow = Color.Lerp(Color.white, sky.colors.shadow, strength);
+        var shadowSource = GenCelestial.GetLightSourceInfo(map, GenCelestial.LightType.Shadow);
+        PreviewShadows.Resolve(shadowSource.vector, PreviewShadows.Override(map.skyManager), sky.colors.shadow,
+            strength, out var shadowDirection, out var shadow);
         AddColor(MatBases.SunShadow, shadow);
         AddColor(MatBases.SunShadowFade, shadow);
 
-        var shadowSource = GenCelestial.GetLightSourceInfo(map, GenCelestial.LightType.Shadow);
         var sun = GenCelestial.GetLightSourceInfo(map, GenCelestial.LightType.LightingSun);
         var moon = GenCelestial.GetLightSourceInfo(map, GenCelestial.LightType.LightingMoon);
-        common.Add(DrawProperty.Vector(ShaderPropertyIDs.MapSunLightDirection, LightVector(shadowSource, strength)));
+        common.Add(DrawProperty.Vector(ShaderPropertyIDs.MapSunLightDirection, shadowDirection));
         common.Add(DrawProperty.Vector(ShaderPropertyIDs.WaterCastVectSun, LightVector(sun, sun.intensity)));
         common.Add(DrawProperty.Vector(ShaderPropertyIDs.WaterCastVectMoon, LightVector(moon, moon.intensity)));
         common.Add(DrawProperty.Float(shineSize, 20f / Mathf.Max(0.001f, sky.lightsourceShineSize)));

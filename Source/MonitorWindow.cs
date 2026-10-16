@@ -58,6 +58,7 @@ public sealed class MonitorWindow : Window
         absorbInputAroundWindow = false;
         preventCameraMotion = false;
         closeOnAccept = false;
+        layer = Docked ? WindowLayer.GameUI : WindowLayer.Dialog;
         ColonyMonitorMod.Settings.Enabled = true;
         gameState = Current.Game.GetComponent<MonitorGameComponent>();
         var initial = Find.Maps.FirstOrDefault(m => m.uniqueID == gameState.SelectedMapId)
@@ -172,7 +173,6 @@ public sealed class MonitorWindow : Window
             windowRect = MonitorLayout.DockRect(UI.screenWidth, UI.screenHeight, settings.DockSize,
                 settings.DockCorner, settings.DockInsetX, settings.DockInsetY);
         doCloseX = draggable = doWindowBackground = drawShadow = !settings.Docked;
-        layer = settings.Docked ? WindowLayer.GameUI : WindowLayer.Dialog;
         closeOnCancel = !settings.Docked;
         wasDocked = settings.Docked;
     }
@@ -268,6 +268,7 @@ public sealed class MonitorWindow : Window
 
     public override void DoWindowContents(Rect rect)
     {
+        MonitorWindowOrder.SetLayer(this, Docked ? WindowLayer.GameUI : WindowLayer.Dialog, Find.WindowStack);
         if (Docked)
         {
             DrawPreview(rect);

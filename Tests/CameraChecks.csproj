@@ -21,6 +21,7 @@
   <ItemGroup>
     <Compile Include="..\Source\CameraPreview.cs" Link="CameraPreview.cs" />
     <Compile Include="..\Source\PreviewEnvironment.cs" Link="PreviewEnvironment.cs" />
+    <Compile Include="..\Source\PreviewShadows.cs" Link="PreviewShadows.cs" />
     <Compile Include="..\Source\PreviewWater.cs" Link="PreviewWater.cs" />
     <Compile Include="..\Source\PreviewWeatherLayers.cs" Link="PreviewWeatherLayers.cs" />
     <Compile Include="..\Source\PreviewDrawProperties.cs" Link="PreviewDrawProperties.cs" />
@@ -31,6 +32,7 @@
     <Compile Include="..\Source\PreviewInteraction.cs" Link="PreviewInteraction.cs" />
     <Compile Include="..\Source\MonitorGameComponent.cs" Link="MonitorGameComponent.cs" />
     <Compile Include="..\Source\MonitorWindow.cs" Link="MonitorWindow.cs" />
+    <Compile Include="..\Source\MonitorWindowOrder.cs" Link="MonitorWindowOrder.cs" />
     <Compile Include="..\Source\MinimapNavigation.cs" Link="MinimapNavigation.cs" />
     <Compile Include="..\Source\ViewportOverlay.cs" Link="ViewportOverlay.cs" />
     <Compile Include="..\Source\MonitorLayout.cs" Link="MonitorLayout.cs" />
