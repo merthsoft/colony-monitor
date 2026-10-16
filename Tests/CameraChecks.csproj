@@ -31,6 +31,7 @@
     <Compile Include="..\Source\PreviewInteraction.cs" Link="PreviewInteraction.cs" />
     <Compile Include="..\Source\MonitorGameComponent.cs" Link="MonitorGameComponent.cs" />
     <Compile Include="..\Source\MonitorWindow.cs" Link="MonitorWindow.cs" />
+    <Compile Include="..\Source\MinimapNavigation.cs" Link="MinimapNavigation.cs" />
     <Compile Include="..\Source\ViewportOverlay.cs" Link="ViewportOverlay.cs" />
     <Compile Include="..\Source\MonitorLayout.cs" Link="MonitorLayout.cs" />
     <Compile Include="..\Source\MonitorToggle.cs" Link="MonitorToggle.cs" />

@@ -26,6 +26,8 @@ public sealed class MonitorWindow : Window
     private readonly PreviewInteraction pan = new();
     private bool previewPress;
     private Vector2 previewPressPosition;
+    private Rect navigationImage;
+    private Rect navigationWorld;
     private int previewControl;
     private bool wasDocked;
     private Rect floatingRect;
@@ -81,6 +83,15 @@ public sealed class MonitorWindow : Window
         if (!Find.Maps.Contains(selected)) SelectMap(Find.Maps[0]);
         // Recover mouse-up lost outside the game.
         if (panning && !Input.GetMouseButton(1)) EndPan();
+        if (previewPress)
+        {
+            if (Input.GetMouseButton(0)) JumpFromPreview();
+            else
+            {
+                previewPress = false;
+                if (GUIUtility.hotControl == previewControl) GUIUtility.hotControl = 0;
+            }
+        }
         if (view.Follow != null)
         {
             if (view.Follow.Spawned && view.Follow.Map == selected && !view.Follow.Dead)
@@ -405,12 +416,13 @@ public sealed class MonitorWindow : Window
     private void HandlePreviewInput(Rect image, Rect world, float scale)
     {
         var ev = Event.current;
+        var pointer = UI.MousePositionOnUIInverted - windowRect.position - new Vector2(Margin, Margin);
         int control = GUIUtility.GetControlID(FocusType.Passive);
-        bool inside = image.Contains(ev.mousePosition);
+        bool inside = image.Contains(pointer);
         if (UseCamera && ev.type == EventType.ScrollWheel && inside)
         {
             view.Zoom(Mathf.Pow(1.15f, Mathf.Clamp(ev.delta.y, -5, 5)),
-                new Vector2((ev.mousePosition.x - image.x) / image.width, (ev.mousePosition.y - image.y) / image.height), selected.Size);
+                new Vector2((pointer.x - image.x) / image.width, (pointer.y - image.y) / image.height), selected.Size);
             ev.Use();
         }
         if (UseCamera && ev.type == EventType.MouseDown && ev.button == 1 && inside)
@@ -418,19 +430,19 @@ public sealed class MonitorWindow : Window
             panning = true;
             panControl = control;
             GUIUtility.hotControl = control;
-            pan.Begin(ev.mousePosition);
+            pan.Begin(pointer);
             view.Follow = null;
             previewPress = false;
             ev.Use();
         }
         if (panning && (ev.rawType == EventType.MouseDrag || ev.rawType == EventType.MouseMove))
         {
-            pan.Move(ev.mousePosition, view, image.width, selected.Size);
+            pan.Move(pointer, view, image.width, selected.Size);
             ev.Use();
         }
         if (panning && ev.rawType == EventType.MouseUp && ev.button == 1)
         {
-            pan.Move(ev.mousePosition, view, image.width, selected.Size);
+            pan.Move(pointer, view, image.width, selected.Size);
             EndPan();
             ev.Use();
         }
@@ -441,31 +453,33 @@ public sealed class MonitorWindow : Window
             previewDragged = false;
             previewControl = control;
             GUIUtility.hotControl = control;
-            previewPressPosition = ev.mousePosition;
+            previewPressPosition = pointer;
+            navigationImage = new Rect(image.position + windowRect.position + new Vector2(Margin, Margin), image.size);
+            navigationWorld = world;
+            JumpFromPreview();
             ev.Use();
         }
         if (previewPress && (ev.rawType == EventType.MouseDrag || ev.rawType == EventType.MouseMove))
         {
-            previewDragged |= (ev.mousePosition - previewPressPosition).sqrMagnitude >= 25;
-            if (previewDragged) JumpFromPreview(ev.mousePosition, image, world, scale);
+            previewDragged |= (pointer - previewPressPosition).sqrMagnitude >= 25;
+            if (previewDragged) JumpFromPreview();
             ev.Use();
         }
         if (previewPress && ev.rawType == EventType.MouseUp && ev.button == 0)
         {
             previewPress = false;
             if (GUIUtility.hotControl == previewControl) GUIUtility.hotControl = 0;
-            if (previewDragged || (inside && (ev.mousePosition - previewPressPosition).sqrMagnitude < 25))
+            if (previewDragged || (inside && (pointer - previewPressPosition).sqrMagnitude < 25))
             {
-                JumpFromPreview(ev.mousePosition, image, world, scale);
+                JumpFromPreview();
             }
             ev.Use();
         }
     }
 
-    private void JumpFromPreview(Vector2 pointer, Rect image, Rect world, float scale)
+    private void JumpFromPreview()
     {
-        var cell = new IntVec3(Mathf.Clamp((int)(world.x + (pointer.x - image.x) / scale), 0, selected.Size.x - 1), 0,
-            Mathf.Clamp((int)(world.y + (image.yMax - pointer.y) / scale), 0, selected.Size.z - 1));
-        CameraJumper.TryJump(cell, selected);
+        var cell = MinimapNavigation.Target(UI.MousePositionOnUIInverted, navigationImage, navigationWorld, selected.Size);
+        CameraJumper.TryJump(cell, selected, CameraJumper.MovementMode.Cut);
     }
 }

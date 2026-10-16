@@ -35,6 +35,16 @@ internal static class Program
         var map = (Map)RuntimeHelpers.GetUninitializedObject(typeof(Map));
         new Harmony("Merthsoft.ColonyMonitor.CameraChecks").PatchAll();
         Check(!PreviewContext.Active, "context initially inactive");
+        var navigationImage = new Rect(800, 100, 200, 200);
+        var navigationWorld = new Rect(0, 0, 325, 325);
+        var navigationSize = new IntVec3(325, 1, 325);
+        Check(MinimapNavigation.Target(new Vector2(850, 150), navigationImage, navigationWorld, navigationSize)
+            == new IntVec3(81, 0, 243), "RTS navigation maps the pointer inside an offset minimap directly to world coordinates");
+        Check(MinimapNavigation.Target(new Vector2(850, 150), navigationImage, navigationWorld, navigationSize)
+            == MinimapNavigation.Target(new Vector2(250, 450), new Rect(200, 400, 200, 200), navigationWorld, navigationSize),
+            "moving the minimap window does not change the world location under the same relative pointer");
+        Check(MinimapNavigation.Target(new Vector2(1200, 0), navigationImage, navigationWorld, navigationSize)
+            == new IntVec3(324, 0, 324), "captured minimap drags stop at map edges");
         var viewport = ViewportOverlay.Project(new Rect(20, 30, 40, 20), new Rect(0, 0, 100, 100), new Rect(10, 20, 200, 200));
         Check(viewport == new Rect(50, 120, 80, 40), "viewport overlay maps world coordinates with north at the top");
         viewport = ViewportOverlay.Project(new Rect(10, 30, 40, 20), new Rect(20, 20, 40, 40), new Rect(0, 0, 200, 200));
