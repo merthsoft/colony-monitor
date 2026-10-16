@@ -22,7 +22,6 @@ public sealed class MonitorWindow : Window
     private MonitorGameComponent gameState;
     private bool panning;
     private int panControl;
-    private int panButton = 1;
     private bool previewDragged;
     private readonly PreviewInteraction pan = new();
     private bool previewPress;
@@ -81,7 +80,7 @@ public sealed class MonitorWindow : Window
         ApplyLayout(settings);
         if (!Find.Maps.Contains(selected)) SelectMap(Find.Maps[0]);
         // Recover mouse-up lost outside the game.
-        if (panning && !Input.GetMouseButton(panButton)) EndPan();
+        if (panning && !Input.GetMouseButton(1)) EndPan();
         if (view.Follow != null)
         {
             if (view.Follow.Spawned && view.Follow.Map == selected && !view.Follow.Dead)
@@ -327,7 +326,7 @@ public sealed class MonitorWindow : Window
             TooltipHandler.TipRegion(point.ExpandedBy(2), pawn.LabelShortCap);
         }
         TooltipHandler.TipRegion(image, UseCamera
-            ? "Scroll to zoom. Drag to pan. Click to jump. Green: colonists; yellow: downed; red: hostiles."
+            ? "Scroll to zoom. Left-drag to move the main viewport. Right-drag to pan this view. Click to jump. Green: colonists; yellow: downed; red: hostiles."
             : "Click or drag to move the main camera. Green: colonists; yellow: downed; red: hostiles.");
         if (Docked)
         {
@@ -417,7 +416,6 @@ public sealed class MonitorWindow : Window
         if (UseCamera && ev.type == EventType.MouseDown && ev.button == 1 && inside)
         {
             panning = true;
-            panButton = 1;
             panControl = control;
             GUIUtility.hotControl = control;
             pan.Begin(ev.mousePosition);
@@ -430,7 +428,7 @@ public sealed class MonitorWindow : Window
             pan.Move(ev.mousePosition, view, image.width, selected.Size);
             ev.Use();
         }
-        if (panning && ev.rawType == EventType.MouseUp && ev.button == panButton)
+        if (panning && ev.rawType == EventType.MouseUp && ev.button == 1)
         {
             pan.Move(ev.mousePosition, view, image.width, selected.Size);
             EndPan();
@@ -449,26 +447,14 @@ public sealed class MonitorWindow : Window
         if (previewPress && (ev.rawType == EventType.MouseDrag || ev.rawType == EventType.MouseMove))
         {
             previewDragged |= (ev.mousePosition - previewPressPosition).sqrMagnitude >= 25;
-            if (previewDragged)
-            {
-                if (UseCamera)
-                {
-                    panning = true;
-                    panButton = 0;
-                    panControl = previewControl;
-                    pan.Begin(previewPressPosition);
-                    pan.Move(ev.mousePosition, view, image.width, selected.Size);
-                    previewPress = false;
-                }
-                else JumpFromPreview(ev.mousePosition, image, world, scale);
-            }
+            if (previewDragged) JumpFromPreview(ev.mousePosition, image, world, scale);
             ev.Use();
         }
         if (previewPress && ev.rawType == EventType.MouseUp && ev.button == 0)
         {
             previewPress = false;
             if (GUIUtility.hotControl == previewControl) GUIUtility.hotControl = 0;
-            if (inside && !previewDragged && (ev.mousePosition - previewPressPosition).sqrMagnitude < 25)
+            if (previewDragged || (inside && (ev.mousePosition - previewPressPosition).sqrMagnitude < 25))
             {
                 JumpFromPreview(ev.mousePosition, image, world, scale);
             }
