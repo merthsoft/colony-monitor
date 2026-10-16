@@ -139,7 +139,14 @@ internal static class Program
         state.Size = float.NaN;
         state.Center = new Vector2(float.PositiveInfinity, -100);
         state.Clamp(mapSize);
-        Check(state.Size == 40 && state.Center.x == 125 && state.Center.y == 0, "invalid saved view sanitized");
+        Check(state.Size == 125 && state.Center.x == 125 && state.Center.y == 0, "invalid saved view sanitized");
+        var largeMap = (Map)RuntimeHelpers.GetUninitializedObject(typeof(Map));
+        largeMap.info = new MapInfo { Size = new IntVec3(325, 1, 325) };
+        var fullView = new MonitorGameComponent(null).GetView(largeMap, out _);
+        Check(fullView.Center == new Vector2(162.5f, 162.5f) && fullView.Size == 162.5f,
+            "325-cell map starts centered and fully visible");
+        fullView.Zoom(2, new Vector2(0.5f, 0.5f), largeMap.Size);
+        Check(fullView.Size == 162.5f, "zoom-out limit fits the full map instead of stopping at 150 cells");
         map.uniqueID = 101;
         var anotherMap = (Map)RuntimeHelpers.GetUninitializedObject(typeof(Map));
         anotherMap.info = new MapInfo { Size = mapSize };

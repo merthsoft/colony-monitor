@@ -21,9 +21,18 @@ public sealed class CameraViewState : IExposable
 
     public void Clamp(IntVec3 mapSize)
     {
-        Size = float.IsFinite(Size) ? Math.Clamp(Size, 8f, 150f) : 40f;
+        Size = float.IsFinite(Size) ? Math.Clamp(Size, 8f, FullMapSize(mapSize)) : FullMapSize(mapSize);
         Center = new Vector2(float.IsFinite(Center.x) ? Math.Clamp(Center.x, 0, mapSize.x) : mapSize.x / 2f,
             float.IsFinite(Center.y) ? Math.Clamp(Center.y, 0, mapSize.z) : mapSize.z / 2f);
+    }
+
+    private static float FullMapSize(IntVec3 mapSize) => Math.Max(8f, Math.Max(mapSize.x, mapSize.z) / 2f);
+
+    public void FitMap(IntVec3 mapSize)
+    {
+        Center = new Vector2(mapSize.x / 2f, mapSize.z / 2f);
+        Size = FullMapSize(mapSize);
+        Follow = null;
     }
 
     public void Pan(Vector2 deltaPixels, float imageSize, IntVec3 mapSize)
@@ -38,7 +47,7 @@ public sealed class CameraViewState : IExposable
     {
         if (!float.IsFinite(factor) || factor <= 0) return;
         float previous = Size;
-        Size = Math.Clamp(Size * factor, 8f, 150f);
+        Size = Math.Clamp(Size * factor, 8f, FullMapSize(mapSize));
 
         Center += new Vector2(anchor.x - 0.5f, 0.5f - anchor.y) * (2 * (previous - Size));
         Clamp(mapSize);

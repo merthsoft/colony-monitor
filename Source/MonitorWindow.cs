@@ -22,6 +22,8 @@ public sealed class MonitorWindow : Window
     private MonitorGameComponent gameState;
     private bool panning;
     private int panControl;
+    private int panButton = 1;
+    private bool previewDragged;
     private readonly PreviewInteraction pan = new();
     private bool previewPress;
     private Vector2 previewPressPosition;
@@ -79,7 +81,7 @@ public sealed class MonitorWindow : Window
         ApplyLayout(settings);
         if (!Find.Maps.Contains(selected)) SelectMap(Find.Maps[0]);
         // Recover mouse-up lost outside the game.
-        if (panning && !Input.GetMouseButton(1)) EndPan();
+        if (panning && !Input.GetMouseButton(panButton)) EndPan();
         if (view.Follow != null)
         {
             if (view.Follow.Spawned && view.Follow.Map == selected && !view.Follow.Dead)
@@ -138,11 +140,10 @@ public sealed class MonitorWindow : Window
         previewPress = false;
         selected = map;
         if (!FollowsCurrentMap) gameState.SelectedMapId = map.uniqueID;
-        view = gameState.GetView(map, out var created);
+        view = gameState.GetView(map, out _);
         ReleaseTexture();
         failed = false;
         cameraFailed = false;
-        if (created) CenterCamera();
         refreshedAt = -100f;
     }
 
@@ -326,8 +327,8 @@ public sealed class MonitorWindow : Window
             TooltipHandler.TipRegion(point.ExpandedBy(2), pawn.LabelShortCap);
         }
         TooltipHandler.TipRegion(image, UseCamera
-            ? "Scroll to zoom. Right-drag to pan. Click to jump. Green: colonists; yellow: downed; red: hostiles."
-            : "Click to jump. Green: colonists; yellow: downed; red: hostiles.");
+            ? "Scroll to zoom. Drag to pan. Click to jump. Green: colonists; yellow: downed; red: hostiles."
+            : "Click or drag to move the main camera. Green: colonists; yellow: downed; red: hostiles.");
         if (Docked)
         {
             TooltipHandler.TipRegion(area, $"{selected.Parent.LabelCap}. Right-click the monitor icon for controls.");
@@ -369,6 +370,7 @@ public sealed class MonitorWindow : Window
     {
         var choices = new System.Collections.Generic.List<FloatMenuOption>
         {
+            new("Whole map", () => { view.FitMap(selected.Size); refreshedAt = -100f; }),
             new("Colonists", CenterCamera),
             new("Map center", () => { view.Follow = null; view.Center = new Vector2(selected.Size.x / 2f, selected.Size.z / 2f); })
         };
@@ -415,6 +417,7 @@ public sealed class MonitorWindow : Window
         if (UseCamera && ev.type == EventType.MouseDown && ev.button == 1 && inside)
         {
             panning = true;
+            panButton = 1;
             panControl = control;
             GUIUtility.hotControl = control;
             pan.Begin(ev.mousePosition);
@@ -427,7 +430,7 @@ public sealed class MonitorWindow : Window
             pan.Move(ev.mousePosition, view, image.width, selected.Size);
             ev.Use();
         }
-        if (panning && ev.rawType == EventType.MouseUp && ev.button == 1)
+        if (panning && ev.rawType == EventType.MouseUp && ev.button == panButton)
         {
             pan.Move(ev.mousePosition, view, image.width, selected.Size);
             EndPan();
@@ -437,23 +440,46 @@ public sealed class MonitorWindow : Window
         if (ev.type == EventType.MouseDown && ev.button == 0 && inside)
         {
             previewPress = true;
+            previewDragged = false;
             previewControl = control;
             GUIUtility.hotControl = control;
             previewPressPosition = ev.mousePosition;
             ev.Use();
         }
-        if (previewPress && ev.type == EventType.MouseDrag) ev.Use();
+        if (previewPress && (ev.rawType == EventType.MouseDrag || ev.rawType == EventType.MouseMove))
+        {
+            previewDragged |= (ev.mousePosition - previewPressPosition).sqrMagnitude >= 25;
+            if (previewDragged)
+            {
+                if (UseCamera)
+                {
+                    panning = true;
+                    panButton = 0;
+                    panControl = previewControl;
+                    pan.Begin(previewPressPosition);
+                    pan.Move(ev.mousePosition, view, image.width, selected.Size);
+                    previewPress = false;
+                }
+                else JumpFromPreview(ev.mousePosition, image, world, scale);
+            }
+            ev.Use();
+        }
         if (previewPress && ev.rawType == EventType.MouseUp && ev.button == 0)
         {
             previewPress = false;
             if (GUIUtility.hotControl == previewControl) GUIUtility.hotControl = 0;
-            if (inside && (ev.mousePosition - previewPressPosition).sqrMagnitude < 25)
+            if (inside && !previewDragged && (ev.mousePosition - previewPressPosition).sqrMagnitude < 25)
             {
-                var cell = new IntVec3(Mathf.Clamp((int)(world.x + (ev.mousePosition.x - image.x) / scale), 0, selected.Size.x - 1), 0,
-                    Mathf.Clamp((int)(world.y + (image.yMax - ev.mousePosition.y) / scale), 0, selected.Size.z - 1));
-                CameraJumper.TryJump(cell, selected);
+                JumpFromPreview(ev.mousePosition, image, world, scale);
             }
             ev.Use();
         }
+    }
+
+    private void JumpFromPreview(Vector2 pointer, Rect image, Rect world, float scale)
+    {
+        var cell = new IntVec3(Mathf.Clamp((int)(world.x + (pointer.x - image.x) / scale), 0, selected.Size.x - 1), 0,
+            Mathf.Clamp((int)(world.y + (image.yMax - pointer.y) / scale), 0, selected.Size.z - 1));
+        CameraJumper.TryJump(cell, selected);
     }
 }

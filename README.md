@@ -11,7 +11,7 @@ Click the monitor icon in the lower-right corner to show or hide it. Right-click
 - **Minimap:** terrain, buildings, and pawn markers.
 - **Camera:** the full game view, with lighting and optional weather.
 
-Click the picture to jump to that location. In camera mode, scroll to zoom and right-drag to pan. Use **Center** or **Follow colonist** from the window or icon menu. Each map remembers its camera view.
+Click the picture to jump to that location. In camera mode, scroll to zoom and left- or right-drag to pan. Dragging on the minimap moves the main viewport. New camera views start centered on the whole map; use Center > Whole map to reset a saved view. Use **Center** or **Follow colonist** from the window or icon menu. Each map remembers its camera view.
 
 Markers: green for colonists, yellow for downed colonists, red for hostiles. A gray rectangle shows your viewport when watching the current map; turn it off with Current viewport in settings.
 

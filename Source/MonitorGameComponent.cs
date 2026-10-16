@@ -27,6 +27,7 @@ public sealed class MonitorGameComponent : GameComponent
         if (created)
         {
             view = new CameraViewState { MapId = map.uniqueID };
+            view.FitMap(map.Size);
             views.Add(view);
         }
         view.Clamp(map.Size);
